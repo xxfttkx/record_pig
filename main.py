@@ -13,7 +13,6 @@ class PigStatus:
         self.line = line
         self.pos = pos
         self.lineBusy = False
-        self.time = time.time()   # 记录添加时间
         self.alive = True
 
 class PigLineController:
@@ -175,7 +174,6 @@ async def root(request: Request):
     return {}
 
 if __name__ == "__main__":
-    controller = PigLineController()
     uvicorn.run(
         app,
         host="0.0.0.0",
