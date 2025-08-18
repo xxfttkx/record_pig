@@ -18,7 +18,7 @@ class PigStatus:
 class PigLineController:
     def __init__(self):
         self.target_group = 940409582
-        self.target_group = 691859318
+        # self.target_group = 691859318
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
         self.alias_map = {
@@ -38,6 +38,7 @@ class PigLineController:
             "玉足": "驿站",
             "驿站": "驿站",
             "y": "崖之遗迹",
+            "ya": "崖之遗迹",
             "崖": "崖之遗迹",
             "遗迹": "崖之遗迹",
             "崖之": "崖之遗迹",
@@ -59,12 +60,14 @@ class PigLineController:
         ts = data.get("time")
         dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
         msg = data.get("raw_message", "").strip()
-        print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {msg}")
+        # 忽略图片 CQ 码
+        msg = re.sub(r"\[CQ:image[^\]]*\]", "", msg).strip()
         match = self.pattern.match(msg)
         if match:
+            print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {msg}")
             number = match.group(1)   # 数字部分
             line = int(number)
-            text = match.group(2)     # 英文或中文部分
+            text = match.group(2).lower()     # 英文或中文部分
             if line>200:
                 return
             if text in self.alias_map:
@@ -81,11 +84,16 @@ class PigLineController:
     
     def add(self, pig: PigStatus):
         """添加一个 PigStatus"""
-        # 如果该 line 已经存在，就不重复添加
-        if not any(p.line == pig.line for p in self.pigs):
+        curr_pig = self.get(pig.line)
+        if not curr_pig:
             self.pigs.append(pig)
             self.sendMsg()
-            asyncio.create_task(self._auto_delete(pig.line, 120))
+            asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
+        else:
+            if curr_pig.pos != pig.pos:
+                curr_pig.pos = pig.pos
+                self.sendMsg()
+
 
     async def _auto_delete(self, line: int, ttl: int):
         """延时 ttl 秒后删除指定线路"""
