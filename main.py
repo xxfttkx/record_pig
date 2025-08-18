@@ -18,8 +18,9 @@ class PigStatus:
 class PigLineController:
     def __init__(self):
         self.target_group = 940409582
+        self.target_group = 691859318
         self.pigs = []
-        self.pattern = re.compile(r"^(\d+)([A-Za-z]+|[\u4e00-\u9fff]+)$")
+        self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
         self.alias_map = {
             "左": "左上",
             "左上": "左上",
@@ -54,7 +55,11 @@ class PigLineController:
             "爆": "b",
         }
     
-    def receiveMsg(self, msg):
+    def receiveMsg(self, data):
+        ts = data.get("time")
+        dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
+        msg = data.get("raw_message", "").strip()
+        print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {msg}")
         match = self.pattern.match(msg)
         if match:
             number = match.group(1)   # 数字部分
@@ -149,9 +154,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843}
-# 正则：数字+英文 或 数字+中文
-pattern = re.compile(r"^\d+(?:[A-Za-z]+|[\u4e00-\u9fff]+)$")
+TARGET_GROUPS = {875329843, 1011106510}
 
 @app.post("/")
 async def root(request: Request):
@@ -162,15 +165,7 @@ async def root(request: Request):
     group_id = data.get("group_id")
     # 判断是不是目标群
     if group_id in TARGET_GROUPS:
-        # 转换为 datetime，并加上时区 UTC+8
-        raw_message = data.get("raw_message", "").strip()
-        # 判断是否是有效信息
-        if pattern.match(raw_message):
-            controller.receiveMsg(raw_message)
-            ts = data.get("time")
-            dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
-            print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {raw_message}")
-            
+        controller.receiveMsg(data) 
     return {}
 
 if __name__ == "__main__":
