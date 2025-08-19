@@ -6,6 +6,7 @@ import asyncio
 import time
 import http.client
 import json
+import sys
 
 
 class PigStatus:
@@ -177,6 +178,7 @@ async def root(request: Request):
     return {}
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding='utf-8')
     uvicorn.run(
         app,
         host="0.0.0.0",
