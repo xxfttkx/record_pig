@@ -15,6 +15,10 @@ class PigStatus:
         self.pos = pos
         self.lineBusy = False
         self.alive = True
+    
+    def isDead(self):
+        """判断当前状态是否已经死亡"""
+        return not self.alive or self.lineBusy
 
 class PigLineController:
     def __init__(self):
@@ -45,6 +49,7 @@ class PigLineController:
             "崖之": "崖之遗迹",
             "涯": "崖之遗迹",
             "崖之遗迹": "崖之遗迹",
+            "k": "卡",
             "ka": "卡",
             "卡": "卡",
             "s": "s",
@@ -63,6 +68,10 @@ class PigLineController:
         msg = data.get("raw_message", "").strip()
         # 忽略图片 CQ 码
         msg = re.sub(r"\[CQ:image[^\]]*\]", "", msg).strip()
+        # 忽略指定关键词
+        ignore_words = ['一手', '1手', '金猪']
+        ignore_pattern = re.compile("|".join(map(re.escape, ignore_words)))
+        msg = re.sub(ignore_pattern, "", msg).strip()
         match = self.pattern.match(msg)
         if match:
             print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {msg}")
@@ -74,11 +83,16 @@ class PigLineController:
             if text in self.alias_map:
                 text = self.alias_map[text]
                 if text == "s":
-                    self.delete(line)
+                    pig = self.get(line)
+                    if pig:
+                        pig.alive = False
+                        self.sendMsg()
+                        self.delete(line)
                 elif text == "b":
                     pig = self.get(line)
                     if pig:
                         pig.lineBusy = True
+                        self.sendMsg()
                         self.delete(line)
                 else:
                     self.add(PigStatus(line, text))
@@ -99,7 +113,11 @@ class PigLineController:
     async def _auto_delete(self, line: int, ttl: int):
         """延时 ttl 秒后删除指定线路"""
         await asyncio.sleep(ttl)
-        self.delete(line)
+        pig = self.get(line)
+        if pig:
+            pig.alive = False
+            self.sendMsg()
+            self.delete(line)
 
     def get(self, line: int):
         """根据线路号获取 PigStatus"""
@@ -112,8 +130,6 @@ class PigLineController:
         """根据线路号删除 PigStatus，删除成功就发送消息"""
         for i, p in enumerate(self.pigs):
             if p.line == line:
-                p.alive = False
-                self.sendMsg()
                 del self.pigs[i]  # 删除目标
                 return True
         return False  # 没有找到要删除的线路
@@ -129,7 +145,12 @@ class PigLineController:
         # 格式化信息，比如每条线路显示 line + busy 状态
         lines_info = []
         for p in self.pigs:
-            status = "❌" if p.lineBusy or not p.alive else "✅"
+            if not p.alive:
+                status = "❌"  # Not alive
+            elif p.lineBusy:
+                status = "💥"  # Line is busy
+            else:
+                status = "✅"  # All good
             lines_info.append(f"{p.line}{p.pos}: {status}")
 
         msg = "\n".join(lines_info)
