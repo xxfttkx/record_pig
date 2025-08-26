@@ -192,7 +192,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843, 1011106510}
+TARGET_GROUPS = {875329843, 1011106510, 827630428}
 
 @app.post("/")
 async def root(request: Request):
