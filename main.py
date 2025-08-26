@@ -3,7 +3,6 @@ from fastapi import FastAPI, Request
 import re
 from datetime import datetime, timezone, timedelta
 import asyncio
-import time
 import http.client
 import json
 import sys
@@ -133,10 +132,6 @@ class PigLineController:
                 del self.pigs[i]  # 删除目标
                 return True
         return False  # 没有找到要删除的线路
-
-    def all(self):
-        """返回所有 PigStatus"""
-        return self.pigs
     
     def sendMsg(self):
         """把当前所有 PigStatus 发到QQ群"""
