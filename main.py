@@ -6,7 +6,7 @@ import asyncio
 import http.client
 import json
 import sys
-
+import requests
 
 class PigStatus:
     def __init__(self, line: int = -1, pos: str = "未知"):
@@ -23,6 +23,7 @@ class PigLineController:
     def __init__(self):
         self.target_group = 940409582
         # self.target_group = 691859318
+        self.backend_url = "http://127.0.0.1:5000/line"  # 后端服务地址
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
         self.alias_map = {
@@ -103,10 +104,22 @@ class PigLineController:
             self.pigs.append(pig)
             self.sendMsg()
             asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
+            self.post_to_backend(pig)
         else:
             if curr_pig.pos != pig.pos:
                 curr_pig.pos = pig.pos
                 self.sendMsg()
+
+    def post_to_backend(self, pig: PigStatus):
+        """把 pig 信息发往后端"""
+        try:
+            payload = {
+                "line": pig.line,
+                "pos": pig.pos,
+            }
+            requests.post(self.backend_url, json=payload, timeout=1)
+        except Exception as e:
+            print(f"⚠️ 后端请求失败: {e}")
 
 
     async def _auto_delete(self, line: int, ttl: int):
