@@ -1,3 +1,4 @@
+import os
 import uvicorn
 from fastapi import FastAPI, Request
 import re
@@ -27,11 +28,17 @@ class PigLineController:
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
         self.alias_map = {
+            "z": "左上",
+            "zuo": "左上",
+            "侦察左": "左上",
+            "侦察左上": "左上",
             "左": "左上",
             "左上": "左上",
             "ys": "右上",
             "原神": "右上",
+            "侦察右上": "左上",
             "右上": "右上",
+            "侦察右": "左上",
             "右": "右",
             "m": "麦田",
             "mai": "麦田",
@@ -44,6 +51,7 @@ class PigLineController:
             "驿站": "驿站",
             "y": "崖之遗迹",
             "ya": "崖之遗迹",
+            "牙": "崖之遗迹",
             "崖": "崖之遗迹",
             "遗迹": "崖之遗迹",
             "崖之": "崖之遗迹",
@@ -52,6 +60,7 @@ class PigLineController:
             "k": "卡",
             "ka": "卡",
             "卡": "卡",
+            "卡尼曼": "卡",
             "s": "s",
             "假": "s",
             "无": "s",
@@ -82,21 +91,45 @@ class PigLineController:
                 return
             if text in self.alias_map:
                 text = self.alias_map[text]
+                pig = self.get(line)
                 if text == "s":
-                    pig = self.get(line)
                     if pig:
                         pig.alive = False
                         self.sendMsg()
                         self.delete(line)
                 elif text == "b":
-                    pig = self.get(line)
                     if pig:
                         pig.lineBusy = True
                         self.sendMsg()
                         self.delete(line)
                 else:
+                    if not pig:
+                        self.recordFirstMsg(data)
                     self.add(PigStatus(line, text))
-    
+
+
+    def recordFirstMsg(self, data):
+        # 时间戳转北京时间
+        ts = data.get("time", 0)
+        dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M:%S")
+
+        # 消息 & 昵称
+        msg = data.get("raw_message", "").strip()
+        sender = data.get("sender", {})
+        nickname = sender.get("nickname", "未知").replace("\n", " ").strip()
+
+        # 日志目录 & 文件
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, f"{date_str}.log")
+
+        # 写入日志
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"[{time_str}] {nickname}: {msg}\n")
+        
+
     def add(self, pig: PigStatus):
         """添加一个 PigStatus"""
         curr_pig = self.get(pig.line)
@@ -192,7 +225,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843, 1011106510, 827630428}
+TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582}
 
 @app.post("/")
 async def root(request: Request):
