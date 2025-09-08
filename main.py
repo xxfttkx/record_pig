@@ -72,18 +72,42 @@ class PigLineController:
         }
     
     def receiveMsg(self, data):
-        ts = data.get("time")
-        dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
         msg = data.get("raw_message", "").strip()
+        self.parseMsg(msg)
+       
+    def parseMsg(self, msg: str):
         # 忽略图片 CQ 码
         msg = re.sub(r"\[CQ:image[^\]]*\]", "", msg).strip()
         # 忽略指定关键词
         ignore_words = ['一手', '1手', '金猪']
         ignore_pattern = re.compile("|".join(map(re.escape, ignore_words)))
         msg = re.sub(ignore_pattern, "", msg).strip()
+
+        # 忽略所有空格
+        msg = msg.replace(" ", "").replace("\t", "")
+        # 递归处理带 "-" 的情况
+        if "-" in msg:
+            parts = msg.split("-")
+            if len(parts) >= 2:
+                # 提取最后一部分的文本
+                last_match = self.pattern.match(parts[-1])
+                last_text = last_match.group(2) if last_match else ""
+                if last_text and last_text in self.alias_map:
+                    for i, part in enumerate(parts):
+                        part = part.strip()
+                        # 如果是前半部分并且纯数字，就补上最后的文字
+                        if i < len(parts) - 1 and part.isdigit() and last_text:
+                            part = part + last_text
+                        self.parseMsg(part)
+            return
+
+        # 否则进入正常处理
+        self.processMsg(msg)
+        
+    
+    def processMsg(self, msg):
         match = self.pattern.match(msg)
         if match:
-            print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {msg}")
             number = match.group(1)   # 数字部分
             line = int(number)
             text = match.group(2).lower()     # 英文或中文部分
@@ -103,8 +127,6 @@ class PigLineController:
                         self.sendMsg()
                         self.delete(line)
                 else:
-                    if not pig:
-                        self.recordFirstMsg(data)
                     self.add(PigStatus(line, text))
 
 
