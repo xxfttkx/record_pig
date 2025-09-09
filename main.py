@@ -106,14 +106,15 @@ class PigLineController:
         # 忽略图片 CQ 码
         msg = re.sub(r"\[CQ:image[^\]]*\]", "", msg).strip()
         # 忽略指定关键词
-        ignore_words = ['一手', '1手', '金猪']
+        ignore_words = ['一手', '1手', '金猪', "世界"]
         ignore_pattern = re.compile("|".join(map(re.escape, ignore_words)))
         msg = re.sub(ignore_pattern, "", msg).strip()
+        msg = msg.strip()
 
-        # 忽略所有空格
-        msg = msg.replace(" ", "").replace("\t", "")
         # 递归处理带 "-" 的情况
         if "-" in msg:
+            # 忽略所有空格
+            msg = msg.replace(" ", "").replace("\t", "")
             parts = msg.split("-")
             if len(parts) >= 2:
                 # 提取最后一部分的文本
@@ -126,6 +127,26 @@ class PigLineController:
                         if i < len(parts) - 1 and part.isdigit() and last_text:
                             part = part + last_text
                         self.parseMsg(part)
+            return
+        
+        # ✅ 支持 "12 35 ys" 这种
+        tokens = re.split(r"[ \t]+", msg)
+        if len(tokens) > 1:
+            pos = ''
+            if tokens[-1].lower() in self.alias_map:
+                pos = self.alias_map[tokens[-1].lower()]
+            else:
+                match = self.pattern.match(msg)
+                if match:
+                    number = match.group(1)   # 数字部分
+                    line = int(number)
+                    pos = match.group(2).lower()     # 英文或中文部分
+            if pos:
+                for t in tokens[:-1]:
+                    if t.isdigit():
+                        self.processMsg(t + pos)
+                    else:
+                        self.processMsg(t)
             return
 
         # 否则进入正常处理
@@ -146,11 +167,9 @@ class PigLineController:
                 if text == "s":
                     if pig:
                         pig.alive = False
-                        self.delete(line)
                 elif text == "b":
                     if pig:
                         pig.lineBusy = True
-                        self.delete(line)
                 else:
                     self.add(PigStatus(line, text))
 
