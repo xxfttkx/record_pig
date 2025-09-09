@@ -15,7 +15,20 @@ class PigStatus:
         self.pos = pos
         self.lineBusy = False
         self.alive = True
+        self.changed = True  # 状态是否有变更
     
+    def needsUpdate(self):
+        """判断当前状态是否需要更新"""
+        needs_update = self.changed or (not self.alive) or self.lineBusy
+        self.changed = False
+        return needs_update
+    
+    def changePos(self, new_pos: str):
+        """更改位置并标记为已变更"""
+        if self.pos != new_pos:
+            self.pos = new_pos
+            self.changed = True
+
     def isDead(self):
         """判断当前状态是否已经死亡"""
         return not self.alive or self.lineBusy
@@ -71,9 +84,23 @@ class PigLineController:
             "爆": "b",
         }
     
+    def trySendMsg(self):
+        pig_change = False
+        for pig in self.pigs:
+            needs_update = pig.needsUpdate()
+            pig_change = pig_change or needs_update
+        if pig_change:
+            self.sendMsg()
+    
+    def deleteOldPigs(self):
+        """删除所有死亡的 PigStatus 并发送更新消息"""
+        self.pigs = [p for p in self.pigs if not p.isDead()]
+        
     def receiveMsg(self, data):
         msg = data.get("raw_message", "").strip()
         self.parseMsg(msg)
+        self.trySendMsg()
+        self.deleteOldPigs()
        
     def parseMsg(self, msg: str):
         # 忽略图片 CQ 码
@@ -119,12 +146,10 @@ class PigLineController:
                 if text == "s":
                     if pig:
                         pig.alive = False
-                        self.sendMsg()
                         self.delete(line)
                 elif text == "b":
                     if pig:
                         pig.lineBusy = True
-                        self.sendMsg()
                         self.delete(line)
                 else:
                     self.add(PigStatus(line, text))
@@ -157,13 +182,10 @@ class PigLineController:
         curr_pig = self.get(pig.line)
         if not curr_pig:
             self.pigs.append(pig)
-            self.sendMsg()
             asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
             self.post_to_backend(pig)
         else:
-            if curr_pig.pos != pig.pos:
-                curr_pig.pos = pig.pos
-                self.sendMsg()
+            curr_pig.changePos(pig.pos)
 
     def post_to_backend(self, pig: PigStatus):
         """把 pig 信息发往后端"""
