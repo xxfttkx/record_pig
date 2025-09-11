@@ -258,31 +258,29 @@ class PigLineController:
         # 调用你的 QQ 群发送函数
         self.send_to_group(msg)
 
-    async def send_to_group(self, msg: str):
-        """把消息发送到 QQ 群 (使用 httpx 异步版)"""
-        try:
-            payload = {
-                "group_id": self.target_group,
-                "message": [
-                    {
-                        "type": "text",
-                        "data": {
-                            "text": msg
-                        }
+    def send_to_group(self, msg: str):
+        """示例：把消息发送到 QQ 群
+        这里你需要接入 LLOneBot 或 OneBot API
+        """
+        conn = http.client.HTTPConnection("127.0.0.1", 3000)
+        payload = json.dumps({
+            "group_id": self.target_group,
+            "message": [
+                {
+                    "type": "text",
+                    "data": {
+                        "text": msg
                     }
-                ]
-            }
-            async with httpx.AsyncClient() as client:
-                r = await client.post(
-                    "http://127.0.0.1:3000/send_group_msg",
-                    json=payload,
-                    timeout=5
-                )
-                r.raise_for_status()
-                # 可选：调试时打印返回
-                # print(r.json())
-        except Exception as e:
-            print(f"⚠️ 发送群消息失败: {e}")
+                }
+            ]
+        })
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        conn.request("POST", "/send_group_msg", payload, headers)
+        # res = conn.getresponse()
+        # data = res.read()
+        # print(data.decode("utf-8"))
 
 # 🔹 在全局初始化 controller
 controller = PigLineController()
