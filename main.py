@@ -213,7 +213,7 @@ class PigLineController:
             async with httpx.AsyncClient(timeout=1) as client:
                 await client.post(self.backend_url, json=payload)
         except Exception as e:
-            print(f"⚠️ 后端请求失败: {e}")
+            pass
 
     async def _auto_delete(self, line: int, ttl: int):
         """延时 ttl 秒后删除指定线路"""
