@@ -1,4 +1,5 @@
 import os
+import httpx
 import uvicorn
 from fastapi import FastAPI, Request
 import re
@@ -173,7 +174,6 @@ class PigLineController:
                 else:
                     self.add(PigStatus(line, text))
 
-
     def recordFirstMsg(self, data):
         # 时间戳转北京时间
         ts = data.get("time", 0)
@@ -207,17 +207,13 @@ class PigLineController:
             curr_pig.changePos(pig.pos)
             self.post_to_backend(pig)
 
-    def post_to_backend(self, pig: PigStatus):
-        """把 pig 信息发往后端"""
+    async def post_to_backend(self, pig: PigStatus):
+        payload = {"line": pig.line, "pos": pig.pos}
         try:
-            payload = {
-                "line": pig.line,
-                "pos": pig.pos,
-            }
-            requests.post(self.backend_url, json=payload, timeout=1)
+            async with httpx.AsyncClient(timeout=1) as client:
+                await client.post(self.backend_url, json=payload)
         except Exception as e:
             print(f"⚠️ 后端请求失败: {e}")
-
 
     async def _auto_delete(self, line: int, ttl: int):
         """延时 ttl 秒后删除指定线路"""
