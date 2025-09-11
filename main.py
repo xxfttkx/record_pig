@@ -111,43 +111,33 @@ class PigLineController:
         ignore_pattern = re.compile("|".join(map(re.escape, ignore_words)))
         msg = re.sub(ignore_pattern, "", msg).strip()
         msg = msg.strip()
-
-        # 递归处理带 "-" 的情况
-        if "-" in msg:
-            # 忽略所有空格
-            msg = msg.replace(" ", "").replace("\t", "")
-            parts = msg.split("-")
-            if len(parts) >= 2:
-                # 提取最后一部分的文本
-                last_match = self.pattern.match(parts[-1])
-                last_text = last_match.group(2) if last_match else ""
-                if last_text and last_text in self.alias_map:
-                    for i, part in enumerate(parts):
-                        part = part.strip()
-                        # 如果是前半部分并且纯数字，就补上最后的文字
-                        if i < len(parts) - 1 and part.isdigit() and last_text:
-                            part = part + last_text
-                        self.parseMsg(part)
-            return
         
-        # ✅ 支持 "12 35 ys" 这种
-        tokens = re.split(r"[ \t]+", msg)
+        # 分割 token，可以拆开空格、制表符、以及'-'，保留数字+字母组合
+        tokens = re.split(r"[- \t]+", msg)
         if len(tokens) > 1:
-            pos = ''
-            if tokens[-1].lower() in self.alias_map:
-                pos = self.alias_map[tokens[-1].lower()]
-            else:
-                match = self.pattern.match(msg)
-                if match:
-                    number = match.group(1)   # 数字部分
-                    line = int(number)
-                    pos = match.group(2).lower()     # 英文或中文部分
-            if pos:
-                for t in tokens[:-1]:
-                    if t.isdigit():
-                        self.processMsg(t + pos)
-                    else:
-                        self.processMsg(t)
+            left = 0
+            right = 0
+            length = len(tokens)
+            while right < length:
+                token = tokens[right]
+                pos = ''
+                if token.lower() in self.alias_map:
+                    pos = self.alias_map[token.lower()]
+                else:
+                    match = self.pattern.match(token)
+                    if match:
+                        number = match.group(1)   # 数字部分
+                        line = int(number)
+                        pos = match.group(2).lower()     # 英文或中文部分
+                if pos:
+                    for t in tokens[left:right+1]:
+                        if t.isdigit():
+                            self.processMsg(t + pos)
+                        else:
+                            self.processMsg(t)
+                    left = right+1
+                right += 1
+                    
             return
 
         # 否则进入正常处理
