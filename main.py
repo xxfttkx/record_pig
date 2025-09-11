@@ -122,6 +122,9 @@ class PigLineController:
             length = len(tokens)
             while right < length:
                 token = tokens[right]
+                if token.isdigit():
+                    right += 1
+                    continue
                 pos = ''
                 if token.lower() in self.alias_map:
                     pos = self.alias_map[token.lower()]
@@ -137,7 +140,7 @@ class PigLineController:
                             self.processMsg(t + pos)
                         else:
                             self.processMsg(t)
-                    left = right+1
+                left = right+1    
                 right += 1
                     
             return
