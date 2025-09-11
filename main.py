@@ -205,6 +205,7 @@ class PigLineController:
             self.post_to_backend(pig)
         else:
             curr_pig.changePos(pig.pos)
+            self.post_to_backend(pig)
 
     def post_to_backend(self, pig: PigStatus):
         """把 pig 信息发往后端"""
