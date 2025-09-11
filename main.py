@@ -36,8 +36,10 @@ class PigStatus:
 
 class PigLineController:
     def __init__(self):
+        self.is_test = False   
         self.target_group = 940409582
-        self.target_group = 691859318
+        if self.is_test:
+            self.target_group = 691859318
         self.backend_url = "http://127.0.0.1:5000/line"  # 后端服务地址
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
@@ -277,7 +279,9 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582, 691859318}
+TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582}
+if controller.is_test:
+    TARGET_GROUPS = {691859318}
 
 @app.post("/")
 async def root(request: Request):
