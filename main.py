@@ -1,3 +1,4 @@
+import os
 import uvicorn
 from fastapi import FastAPI, Request
 import re
@@ -6,7 +7,7 @@ import asyncio
 import http.client
 import json
 import sys
-
+import requests
 
 class PigStatus:
     def __init__(self, line: int = -1, pos: str = "未知"):
@@ -14,7 +15,20 @@ class PigStatus:
         self.pos = pos
         self.lineBusy = False
         self.alive = True
+        self.changed = True  # 状态是否有变更
     
+    def needsUpdate(self):
+        """判断当前状态是否需要更新"""
+        needs_update = self.changed or (not self.alive) or self.lineBusy
+        self.changed = False
+        return needs_update
+    
+    def changePos(self, new_pos: str):
+        """更改位置并标记为已变更"""
+        if self.pos != new_pos:
+            self.pos = new_pos
+            self.changed = True
+
     def isDead(self):
         """判断当前状态是否已经死亡"""
         return not self.alive or self.lineBusy
@@ -23,14 +37,21 @@ class PigLineController:
     def __init__(self):
         self.target_group = 940409582
         # self.target_group = 691859318
+        self.backend_url = "http://127.0.0.1:5000/line"  # 后端服务地址
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
         self.alias_map = {
+            "z": "左上",
+            "zuo": "左上",
+            "侦察左": "左上",
+            "侦察左上": "左上",
             "左": "左上",
             "左上": "左上",
             "ys": "右上",
             "原神": "右上",
+            "侦察右上": "左上",
             "右上": "右上",
+            "侦察右": "左上",
             "右": "右",
             "m": "麦田",
             "mai": "麦田",
@@ -43,6 +64,7 @@ class PigLineController:
             "驿站": "驿站",
             "y": "崖之遗迹",
             "ya": "崖之遗迹",
+            "牙": "崖之遗迹",
             "崖": "崖之遗迹",
             "遗迹": "崖之遗迹",
             "崖之": "崖之遗迹",
@@ -51,6 +73,7 @@ class PigLineController:
             "k": "卡",
             "ka": "卡",
             "卡": "卡",
+            "卡尼曼": "卡",
             "s": "s",
             "假": "s",
             "无": "s",
@@ -61,19 +84,78 @@ class PigLineController:
             "爆": "b",
         }
     
+    def trySendMsg(self):
+        pig_change = False
+        for pig in self.pigs:
+            needs_update = pig.needsUpdate()
+            pig_change = pig_change or needs_update
+        if pig_change:
+            self.sendMsg()
+    
+    def deleteOldPigs(self):
+        """删除所有死亡的 PigStatus 并发送更新消息"""
+        self.pigs = [p for p in self.pigs if not p.isDead()]
+        
     def receiveMsg(self, data):
-        ts = data.get("time")
-        dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
         msg = data.get("raw_message", "").strip()
+        self.parseMsg(msg)
+        self.trySendMsg()
+        self.deleteOldPigs()
+       
+    def parseMsg(self, msg: str):
         # 忽略图片 CQ 码
         msg = re.sub(r"\[CQ:image[^\]]*\]", "", msg).strip()
         # 忽略指定关键词
-        ignore_words = ['一手', '1手', '金猪']
+        ignore_words = ['一手', '1手', '金猪', "世界"]
         ignore_pattern = re.compile("|".join(map(re.escape, ignore_words)))
         msg = re.sub(ignore_pattern, "", msg).strip()
+        msg = msg.strip()
+
+        # 递归处理带 "-" 的情况
+        if "-" in msg:
+            # 忽略所有空格
+            msg = msg.replace(" ", "").replace("\t", "")
+            parts = msg.split("-")
+            if len(parts) >= 2:
+                # 提取最后一部分的文本
+                last_match = self.pattern.match(parts[-1])
+                last_text = last_match.group(2) if last_match else ""
+                if last_text and last_text in self.alias_map:
+                    for i, part in enumerate(parts):
+                        part = part.strip()
+                        # 如果是前半部分并且纯数字，就补上最后的文字
+                        if i < len(parts) - 1 and part.isdigit() and last_text:
+                            part = part + last_text
+                        self.parseMsg(part)
+            return
+        
+        # ✅ 支持 "12 35 ys" 这种
+        tokens = re.split(r"[ \t]+", msg)
+        if len(tokens) > 1:
+            pos = ''
+            if tokens[-1].lower() in self.alias_map:
+                pos = self.alias_map[tokens[-1].lower()]
+            else:
+                match = self.pattern.match(msg)
+                if match:
+                    number = match.group(1)   # 数字部分
+                    line = int(number)
+                    pos = match.group(2).lower()     # 英文或中文部分
+            if pos:
+                for t in tokens[:-1]:
+                    if t.isdigit():
+                        self.processMsg(t + pos)
+                    else:
+                        self.processMsg(t)
+            return
+
+        # 否则进入正常处理
+        self.processMsg(msg)
+        
+    
+    def processMsg(self, msg):
         match = self.pattern.match(msg)
         if match:
-            print(f"[{dt.strftime("%Y-%m-%d %H:%M:%S")}]: {msg}")
             number = match.group(1)   # 数字部分
             line = int(number)
             text = match.group(2).lower()     # 英文或中文部分
@@ -81,32 +163,59 @@ class PigLineController:
                 return
             if text in self.alias_map:
                 text = self.alias_map[text]
+                pig = self.get(line)
                 if text == "s":
-                    pig = self.get(line)
                     if pig:
                         pig.alive = False
-                        self.sendMsg()
-                        self.delete(line)
                 elif text == "b":
-                    pig = self.get(line)
                     if pig:
                         pig.lineBusy = True
-                        self.sendMsg()
-                        self.delete(line)
                 else:
                     self.add(PigStatus(line, text))
-    
+
+
+    def recordFirstMsg(self, data):
+        # 时间戳转北京时间
+        ts = data.get("time", 0)
+        dt = datetime.fromtimestamp(ts, tz=timezone(timedelta(hours=8)))
+        date_str = dt.strftime("%Y-%m-%d")
+        time_str = dt.strftime("%H:%M:%S")
+
+        # 消息 & 昵称
+        msg = data.get("raw_message", "").strip()
+        sender = data.get("sender", {})
+        nickname = sender.get("nickname", "未知").replace("\n", " ").strip()
+
+        # 日志目录 & 文件
+        log_dir = "logs"
+        os.makedirs(log_dir, exist_ok=True)
+        log_file = os.path.join(log_dir, f"{date_str}.log")
+
+        # 写入日志
+        with open(log_file, "a", encoding="utf-8") as f:
+            f.write(f"[{time_str}] {nickname}: {msg}\n")
+        
+
     def add(self, pig: PigStatus):
         """添加一个 PigStatus"""
         curr_pig = self.get(pig.line)
         if not curr_pig:
             self.pigs.append(pig)
-            self.sendMsg()
             asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
+            self.post_to_backend(pig)
         else:
-            if curr_pig.pos != pig.pos:
-                curr_pig.pos = pig.pos
-                self.sendMsg()
+            curr_pig.changePos(pig.pos)
+
+    def post_to_backend(self, pig: PigStatus):
+        """把 pig 信息发往后端"""
+        try:
+            payload = {
+                "line": pig.line,
+                "pos": pig.pos,
+            }
+            requests.post(self.backend_url, json=payload, timeout=1)
+        except Exception as e:
+            print(f"⚠️ 后端请求失败: {e}")
 
 
     async def _auto_delete(self, line: int, ttl: int):
@@ -179,7 +288,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843, 1011106510}
+TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582}
 
 @app.post("/")
 async def root(request: Request):
