@@ -37,7 +37,7 @@ class PigStatus:
 class PigLineController:
     def __init__(self):
         self.target_group = 940409582
-        # self.target_group = 691859318
+        self.target_group = 691859318
         self.backend_url = "http://127.0.0.1:5000/line"  # 后端服务地址
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
@@ -202,10 +202,10 @@ class PigLineController:
         if not curr_pig:
             self.pigs.append(pig)
             asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
-            self.post_to_backend(pig)
+            asyncio.create_task(self.post_to_backend(pig))
         else:
             curr_pig.changePos(pig.pos)
-            self.post_to_backend(pig)
+            asyncio.create_task(self.post_to_backend(pig))
 
     async def post_to_backend(self, pig: PigStatus):
         payload = {"line": pig.line, "pos": pig.pos}
@@ -256,7 +256,7 @@ class PigLineController:
 
         msg = "\n".join(lines_info)
         # 调用你的 QQ 群发送函数
-        self.send_to_group(msg)
+        asyncio.create_task(self.send_to_group(msg))
 
     async def send_to_group(self, msg: str):
         """把消息发送到 QQ 群 (使用 httpx 异步版)"""
@@ -287,7 +287,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582}
+TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582, 691859318}
 
 @app.post("/")
 async def root(request: Request):
