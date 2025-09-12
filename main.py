@@ -115,35 +115,36 @@ class PigLineController:
         msg = msg.strip()
         
         # 分割 token，可以拆开空格、制表符、以及'-'，保留数字+字母组合
-        tokens = re.split(r"[- \t]+", msg)
-        if len(tokens) > 1:
-            left = 0
-            right = 0
-            length = len(tokens)
-            while right < length:
-                token = tokens[right]
-                if token.isdigit():
+        if False:
+            tokens = re.split(r"[- \t]+", msg)
+            if len(tokens) > 1:
+                left = 0
+                right = 0
+                length = len(tokens)
+                while right < length:
+                    token = tokens[right]
+                    if token.isdigit():
+                        right += 1
+                        continue
+                    pos = ''
+                    if token.lower() in self.alias_map:
+                        pos = self.alias_map[token.lower()]
+                    else:
+                        match = self.pattern.match(token)
+                        if match:
+                            number = match.group(1)   # 数字部分
+                            line = int(number)
+                            pos = match.group(2).lower()     # 英文或中文部分
+                    if pos:
+                        for t in tokens[left:right+1]:
+                            if t.isdigit():
+                                self.processMsg(t + pos)
+                            else:
+                                self.processMsg(t)
+                    left = right+1    
                     right += 1
-                    continue
-                pos = ''
-                if token.lower() in self.alias_map:
-                    pos = self.alias_map[token.lower()]
-                else:
-                    match = self.pattern.match(token)
-                    if match:
-                        number = match.group(1)   # 数字部分
-                        line = int(number)
-                        pos = match.group(2).lower()     # 英文或中文部分
-                if pos:
-                    for t in tokens[left:right+1]:
-                        if t.isdigit():
-                            self.processMsg(t + pos)
-                        else:
-                            self.processMsg(t)
-                left = right+1    
-                right += 1
-                    
-            return
+                        
+                return
 
         # 否则进入正常处理
         self.processMsg(msg)
@@ -199,8 +200,9 @@ class PigLineController:
             asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
             asyncio.create_task(self.post_to_backend(pig))
         else:
-            curr_pig.changePos(pig.pos)
-            asyncio.create_task(self.post_to_backend(pig))
+            if curr_pig.pos != pig.pos:
+                curr_pig.changePos(pig.pos)
+                asyncio.create_task(self.post_to_backend(pig))
 
     async def post_to_backend(self, pig: PigStatus):
         payload = {"line": pig.line, "pos": pig.pos}
