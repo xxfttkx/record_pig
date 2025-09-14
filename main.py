@@ -52,9 +52,10 @@ class PigLineController:
             "左上": "左上",
             "ys": "右上",
             "原神": "右上",
-            "侦察右上": "左上",
+            "侦察右上": "右上",
             "右上": "右上",
-            "侦察右": "左上",
+            "侦察右": "右",
+            "you": "右",
             "右": "右",
             "m": "麦田",
             "mai": "麦田",
@@ -87,6 +88,13 @@ class PigLineController:
             "爆": "b",
         }
     
+    def hasPigs(self, line):
+        """检查是否有指定线路的 PigStatus"""
+        for p in self.pigs:
+            if p.line == line:
+                return True
+        return False
+
     def trySendMsg(self):
         pig_change = False
         for pig in self.pigs:
@@ -138,7 +146,9 @@ class PigLineController:
                     if pos:
                         for t in tokens[left:right+1]:
                             if t.isdigit():
-                                self.processMsg(t + pos)
+                                line = int(t)
+                                if not self.hasPigs(line):
+                                    self.processMsg(t + pos)
                             else:
                                 self.processMsg(t)
                     left = right+1    
@@ -284,7 +294,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582}
+TARGET_GROUPS = {875329843, 1011106510, 827630428, 940409582, 232883592}
 if controller.is_test:
     TARGET_GROUPS = {691859318}
 
