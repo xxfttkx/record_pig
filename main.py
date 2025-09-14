@@ -166,7 +166,7 @@ class PigLineController:
             number = match.group(1)   # 数字部分
             line = int(number)
             text = match.group(2).lower()     # 英文或中文部分
-            if line>200:
+            if line<=0 or line>200:
                 return
             if text in self.alias_map:
                 text = self.alias_map[text]
