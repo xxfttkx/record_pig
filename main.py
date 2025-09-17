@@ -1,3 +1,4 @@
+import argparse
 import os
 import httpx
 import uvicorn
@@ -10,6 +11,8 @@ import json
 import sys
 import requests
 
+def log(msg):
+    print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
 class PigStatus:
     def __init__(self, line: int = -1, pos: str = "未知"):
         self.line = line
@@ -17,6 +20,7 @@ class PigStatus:
         self.lineBusy = False
         self.alive = True
         self.changed = True  # 状态是否有变更
+        self.pig_wave = False
     
     def needsUpdate(self):
         """判断当前状态是否需要更新"""
@@ -43,6 +47,7 @@ class PigLineController:
         self.backend_url = "http://127.0.0.1:5000/line"  # 后端服务地址
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
+        # r"^([1-9]\d*)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$"
         self.alias_map = {
             "z": "左上",
             "zuo": "左上",
@@ -123,7 +128,7 @@ class PigLineController:
         msg = msg.strip()
         
         # 分割 token，可以拆开空格、制表符、以及'-'，保留数字+字母组合
-        if False:
+        if self.pig_wave:
             tokens = re.split(r"[- \t]+", msg)
             if len(tokens) > 1:
                 left = 0
@@ -207,7 +212,8 @@ class PigLineController:
         curr_pig = self.get(pig.line)
         if not curr_pig:
             self.pigs.append(pig)
-            asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
+            if not self.pig_wave:
+                asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
             asyncio.create_task(self.post_to_backend(pig))
         else:
             if curr_pig.pos != pig.pos:
@@ -312,6 +318,19 @@ async def root(request: Request):
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
+    
+    # 🔹 参数解析
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-p", "--pig-wave",
+        action="store_true",
+        help="启用猪潮模式"
+    )
+    args = parser.parse_args()
+    pig_wave = args.pig_wave
+    controller.pig_wave = pig_wave
+    log(f"pig_wave: {pig_wave}")
+
     uvicorn.run(
         app,
         host="0.0.0.0",
