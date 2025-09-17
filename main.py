@@ -148,7 +148,7 @@ class PigLineController:
                             number = match.group(1)   # 数字部分
                             line = int(number)
                             pos = match.group(2).lower()     # 英文或中文部分
-                    if pos:
+                    if pos and pos in self.alias_map:
                         for t in tokens[left:right+1]:
                             if t.isdigit():
                                 line = int(t)
@@ -318,7 +318,7 @@ async def root(request: Request):
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
-    
+
     # 🔹 参数解析
     parser = argparse.ArgumentParser()
     parser.add_argument(
