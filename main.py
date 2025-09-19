@@ -142,21 +142,21 @@ class PigLineController:
                     if token.isdigit():
                         right += 1
                         continue
-                    pos = ''
+                    text = ''
                     if token.lower() in self.alias_map:
-                        pos = self.alias_map[token.lower()]
+                        text = self.alias_map[token.lower()]
                     else:
                         match = self.pattern.match(token)
                         if match:
                             number = match.group(1)   # 数字部分
                             line = int(number)
-                            pos = match.group(2).lower()     # 英文或中文部分
-                    if pos and pos in self.alias_map:
+                            text = match.group(2).lower()     # 英文或中文部分
+                    if text and text in self.alias_map:
                         for t in tokens[left:right+1]:
                             if t.isdigit():
                                 line = int(t)
-                                if not self.hasPigs(line):
-                                    self.processMsg(t + pos)
+                                pos = self.alias_map[text]
+                                self.processLineAndPos(line, pos)
                             else:
                                 self.processMsg(t)
                     left = right+1    
@@ -173,20 +173,23 @@ class PigLineController:
         if match:
             number = match.group(1)   # 数字部分
             line = int(number)
-            text = match.group(2).lower()     # 英文或中文部分
             if line<=0 or line>200:
                 return
-            if text in self.alias_map:
-                text = self.alias_map[text]
-                pig = self.get(line)
-                if text == "s":
-                    if pig:
-                        pig.alive = False
-                elif text == "b":
-                    if pig:
-                        pig.lineBusy = True
-                else:
-                    self.add(PigStatus(line, text))
+            text = match.group(2).lower()     # 英文或中文部分
+            if not text or text not in self.alias_map:
+                return
+            self.processLineAndPos(line, self.alias_map[text])
+    
+    def processLineAndPos(self, line: int, pos: str):
+        pig = self.get(line)
+        if pos == "s":
+            if pig:
+                pig.alive = False
+        elif pos == "b":
+            if pig:
+                pig.lineBusy = True
+        else:
+            self.add(PigStatus(line, pos))
 
     def recordFirstMsg(self, data):
         # 时间戳转北京时间
