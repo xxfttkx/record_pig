@@ -181,8 +181,9 @@ class PigLineController:
                         for t in tokens[left:right+1]:
                             if t.isdigit():
                                 line = int(t)
-                                pos = self.alias_map[text]
-                                self.processLineAndPos(line, pos)
+                                if line > 0 and line <= 200:
+                                    pos = self.alias_map[text]
+                                    self.processLineAndPos(line, pos)
                             else:
                                 self.processMsg(t)
                     left = right+1    
