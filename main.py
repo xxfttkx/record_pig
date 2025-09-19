@@ -4,7 +4,7 @@ import httpx
 import uvicorn
 from fastapi import FastAPI, Request
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, time, timezone, timedelta
 import asyncio
 import http.client
 import json
@@ -22,7 +22,7 @@ class PigStatus:
         self.changed = True  # 状态是否有变更
         self.pig_wave = False
     
-    def needsUpdate(self):
+    def consumeUpdateFlag(self):
         """判断当前状态是否需要更新"""
         needs_update = self.changed or (not self.alive) or self.lineBusy
         self.changed = False
@@ -51,6 +51,11 @@ class PigLineController:
         self.pigs = []
         self.pattern = re.compile(r"^(\d+)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$")
         # r"^([1-9]\d*)\s*([A-Za-z]+|[\u4e00-\u9fff]+)$"
+
+        self.last_send_time = 0
+        self.cooldown = 1.0  # 秒
+        self.pending_send = False
+
         self.alias_map = {
             "z": "左上",
             "zuo": "左上",
@@ -106,7 +111,7 @@ class PigLineController:
     def trySendMsg(self):
         pig_change = False
         for pig in self.pigs:
-            needs_update = pig.needsUpdate()
+            needs_update = pig.consumeUpdateFlag()
             pig_change = pig_change or needs_update
         if pig_change:
             self.sendMsg()
@@ -114,12 +119,32 @@ class PigLineController:
     def deleteOldPigs(self):
         """删除所有死亡的 PigStatus 并发送更新消息"""
         self.pigs = [p for p in self.pigs if not p.isDead()]
-        
+    
+    def _schedule_send(self):
+        now = time.time()
+        if now - self.last_send_time >= self.cooldown:
+            # 冷却已过，可以立刻发
+            self.trySendMsg()
+            self.deleteOldPigs()
+            self.last_send_time = now
+        else:
+            # 冷却中，只标记一次待发送
+            if not self.pending_send:
+                self.pending_send = True
+                delay = 0.1 + self.cooldown - (now - self.last_send_time)
+                asyncio.create_task(self._delayed_send(delay))
+
+    async def _delayed_send(self, delay: float):
+        """冷却时间过后再补发一次"""
+        await asyncio.sleep(delay)
+        self.pending_send = False
+        self._schedule_send()
+
     def receiveMsg(self, data):
         msg = data.get("raw_message", "").strip()
         self.parseMsg(msg)
-        self.trySendMsg()
-        self.deleteOldPigs()
+        # 消息解析完毕后，尝试节流发送
+        self._schedule_send()
        
     def parseMsg(self, msg: str):
         # 忽略图片 CQ 码
@@ -321,7 +346,6 @@ async def root(request: Request):
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
-
     # 🔹 参数解析
     parser = argparse.ArgumentParser()
     parser.add_argument(
