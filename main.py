@@ -43,7 +43,7 @@ class PigStatus:
 
 class PigLineController:
     def __init__(self):
-        self.is_test = True
+        self.is_test = False
         self.pig_wave = False
         self.target_group = 940409582
         self.source_groups = {940409582, 875329843, 1011106510, 827630428, 232883592}
@@ -311,7 +311,7 @@ class PigLineController:
     async def send_to_group(self, msg: str):
         """把消息发送到 QQ 群 (使用 httpx 异步版)"""
         try:
-            log(f"➡️ 发送群消息: {msg}")
+            # log(f"➡️ 发送群消息: {msg}")
             payload = {
                 "group_id": self.target_group,
                 "message": [
@@ -352,7 +352,7 @@ async def root(request: Request):
     group_id = data.get("group_id")
     # 判断是不是目标群
     if group_id in controller.source_groups:
-        log("⬅️ 收到群消息: " + data.get("raw_message", "").strip())
+        # log("⬅️ 收到群消息: " + data.get("raw_message", "").strip())
         controller.receiveMsg(data) 
     return {}
 
@@ -365,10 +365,15 @@ if __name__ == "__main__":
         action="store_true",
         help="启用猪潮模式"
     )
+    parser.add_argument(
+        "-t", "--test",
+        action="store_true",
+        help="启用测试模式"
+    )
     args = parser.parse_args()
-    pig_wave = args.pig_wave
-    controller.pig_wave = pig_wave
-    log(f"pig_wave: {pig_wave}")
+    controller.pig_wave = args.pig_wave
+    controller.is_test = args.test
+    log(f"pig_wave: {controller.pig_wave}; is_test: {controller.is_test}")
 
     uvicorn.run(
         app,
