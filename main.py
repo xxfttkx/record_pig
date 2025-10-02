@@ -249,11 +249,11 @@ class PigLineController:
             self.pigs.append(pig)
             if not self.pig_wave:
                 asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
-            asyncio.create_task(self.post_to_backend(pig))
+            # asyncio.create_task(self.post_to_backend(pig))
         else:
             if curr_pig.pos != pig.pos:
                 curr_pig.changePos(pig.pos)
-                asyncio.create_task(self.post_to_backend(pig))
+                # asyncio.create_task(self.post_to_backend(pig))
 
     async def post_to_backend(self, pig: PigStatus):
         payload = {"line": pig.line, "pos": pig.pos}
