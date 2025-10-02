@@ -351,6 +351,12 @@ async def root(request: Request):
         return {}
     group_id = data.get("group_id")
     # 判断是不是目标群
+    if group_id == controller.target_group:
+        msg = data.get("raw_message", "").strip()
+        if msg == '0s':
+            for p in controller.pigs:
+                p.alive = False
+            controller._schedule_send()
     if group_id in controller.source_groups:
         # log("⬅️ 收到群消息: " + data.get("raw_message", "").strip())
         controller.receiveMsg(data) 
@@ -373,6 +379,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     controller.pig_wave = args.pig_wave
     controller.is_test = args.test
+    if controller.is_test:
+        controller.target_group = 691859318
+        controller.source_groups = {691859318}
     log(f"pig_wave: {controller.pig_wave}; is_test: {controller.is_test}")
 
     uvicorn.run(
