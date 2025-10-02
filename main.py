@@ -57,6 +57,8 @@ class PigLineController:
         self.cooldown = 1.0  # 秒
         self.pending_send = False
 
+        self.token = os.getenv("BOT_TOKEN")
+
         self.alias_map = {
             "z": "左上",
             "zuo": "左上",
@@ -318,10 +320,14 @@ class PigLineController:
                     }
                 ]
             }
+            headers = {
+                "Authorization": f"Bearer {self.token}"
+            }
             async with httpx.AsyncClient() as client:
                 r = await client.post(
                     "http://127.0.0.1:3000/send_group_msg",
                     json=payload,
+                    headers=headers,
                     timeout=5
                 )
                 r.raise_for_status()
