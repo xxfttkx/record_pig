@@ -11,6 +11,8 @@ import http.client
 import json
 import sys
 import requests
+from dotenv import load_dotenv
+load_dotenv()  # 这一行要加，才能把.env里的内容读入环境变量
 
 def log(msg):
     print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {msg}")
@@ -41,7 +43,7 @@ class PigStatus:
 
 class PigLineController:
     def __init__(self):
-        self.is_test = False
+        self.is_test = True
         self.pig_wave = False
         self.target_group = 940409582
         self.source_groups = {940409582, 875329843, 1011106510, 827630428, 232883592}
@@ -309,6 +311,7 @@ class PigLineController:
     async def send_to_group(self, msg: str):
         """把消息发送到 QQ 群 (使用 httpx 异步版)"""
         try:
+            log(f"➡️ 发送群消息: {msg}")
             payload = {
                 "group_id": self.target_group,
                 "message": [
@@ -349,6 +352,7 @@ async def root(request: Request):
     group_id = data.get("group_id")
     # 判断是不是目标群
     if group_id in controller.source_groups:
+        log("⬅️ 收到群消息: " + data.get("raw_message", "").strip())
         controller.receiveMsg(data) 
     return {}
 
