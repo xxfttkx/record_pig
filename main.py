@@ -113,6 +113,13 @@ class PigLineController:
                 return True
         return False
 
+    def hasNewPig(self):
+        """检查是否有新的 PigStatus"""
+        for p in self.pigs:
+            if p.changed:
+                return True
+        return False
+
     def trySendMsg(self):
         pig_change = False
         for pig in self.pigs:
@@ -148,6 +155,8 @@ class PigLineController:
     def receiveMsg(self, data):
         msg = data.get("raw_message", "").strip()
         self.parseMsg(msg)
+        if self.hasNewPig():
+            self.recordFirstMsg(data)
         # 消息解析完毕后，尝试节流发送
         self._schedule_send()
        
