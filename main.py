@@ -246,7 +246,9 @@ class PigLineController:
         nickname = sender.get("nickname", "未知").replace("\n", " ").strip()
 
         # 日志目录 & 文件
-        log_dir = "logs"
+        year = dt.strftime("%Y")
+        month = dt.strftime("%m")
+        log_dir = f"logs/{year}/{month}"
         os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, f"{date_str}.log")
 
