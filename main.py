@@ -61,6 +61,8 @@ class PigLineController:
 
         self.token = os.getenv("BOT_TOKEN")
 
+        self.need_record = False  # 是否需要记录消息
+
         self.alias_map = {
             "z": "左上",
             "zuo": "左上",
@@ -112,7 +114,7 @@ class PigLineController:
             if p.line == line:
                 return True
         return False
-
+    
     def hasNewPig(self):
         """检查是否有新的 PigStatus"""
         for p in self.pigs:
@@ -155,7 +157,7 @@ class PigLineController:
     def receiveMsg(self, data):
         msg = data.get("raw_message", "").strip()
         self.parseMsg(msg)
-        if self.hasNewPig():
+        if self.need_record:
             self.recordFirstMsg(data)
         # 消息解析完毕后，尝试节流发送
         self._schedule_send()
@@ -252,17 +254,21 @@ class PigLineController:
         with open(log_file, "a", encoding="utf-8") as f:
             f.write(f"[{time_str}] {nickname}: {msg}\n")
         
+        self.need_record = False
+        
 
     def add(self, pig: PigStatus):
         """添加一个 PigStatus"""
         curr_pig = self.get(pig.line)
         if not curr_pig:
+            self.need_record = True
             self.pigs.append(pig)
             if not self.pig_wave:
                 asyncio.create_task(self._auto_delete(pig.line, 120*len(self.pigs)))
             # asyncio.create_task(self.post_to_backend(pig))
         else:
             if curr_pig.pos != pig.pos:
+                self.need_record = True
                 curr_pig.changePos(pig.pos)
                 # asyncio.create_task(self.post_to_backend(pig))
 
