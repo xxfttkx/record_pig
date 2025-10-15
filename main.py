@@ -381,18 +381,23 @@ async def process_message(data):
     except Exception as e:
         log(f"处理消息时出错: {e}")
 
+
 async def listen(ws_url: str):
     """连接 WebSocket 并监听消息"""
+    connected = False  # 标志位
     while True:
         try:
             async with websockets.connect(ws_url) as ws:
-                log("已连接到 WebSocket")
+                if not connected:
+                    log("已连接到 WebSocket")
+                    connected = True  # 标记为已连接
                 async for msg in ws:
                     data = json.loads(msg)
                     await process_message(data)
 
         except Exception as e:
             log(f"连接失败或断开: {e}, 10秒后重试...")
+            connected = False
             await asyncio.sleep(10)  # 连接失败后等待10秒再重试
 
 if __name__ == "__main__":
