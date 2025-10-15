@@ -2,15 +2,16 @@ import argparse
 import os
 import httpx
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 import re
 from datetime import datetime, timezone, timedelta
 import time
 import asyncio
+import http.client
 import json
 import sys
+import requests
 from dotenv import load_dotenv
-import websockets
 load_dotenv()  # 这一行要加，才能把.env里的内容读入环境变量
 
 def log(msg):
@@ -358,54 +359,25 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 app = FastAPI()
-# 配置 WebSocket 连接地址
 
-WS_URL = "ws://127.0.0.1:3001"
-
-async def process_message(data):
-    """处理从 WebSocket 接收到的消息"""
-    try:
-        # 过滤非群聊消息
-        if data.get("message_type") != "group":
-            return {}
-        group_id = data.get("group_id")
-        # 判断是不是目标群
-        if group_id == controller.target_group:
-            msg = data.get("raw_message", "").strip()
-            if msg == '0s':
-                for p in controller.pigs:
-                    p.alive = False
-                controller._schedule_send()
-        if group_id in controller.source_groups:
-            # log("⬅️ 收到群消息: " + data.get("raw_message", "").strip())
-            controller.receiveMsg(data) 
-        return
-    except Exception as e:
-        log(f"处理消息时出错: {e}")
-
-async def listen(ws_url: str):
-    """连接 WebSocket 并监听消息"""
-    while True:
-        try:
-            async with websockets.connect(ws_url) as ws:
-                log("已连接到 WebSocket")
-                async for msg in ws:
-                    data = json.loads(msg)
-                    await process_message(data)
-
-        except Exception as e:
-            log(f"连接失败或断开: {e}, 10秒后重试...")
-            await asyncio.sleep(10)  # 连接失败后等待10秒再重试
-
-@app.on_event("startup")
-async def startup():
-    """FastAPI 启动时启动 WebSocket 监听"""
-    # 启动 WebSocket 监听任务
-    asyncio.create_task(listen(WS_URL))
-
-@app.get("/")
-async def get_status():
-    return {"message": "WebSocket 监听正在运行..."}
+@app.post("/")
+async def root(request: Request):
+    data = await request.json()  # 获取事件数据
+    # 过滤非群聊消息
+    if data.get("message_type") != "group":
+        return {}
+    group_id = data.get("group_id")
+    # 判断是不是目标群
+    if group_id == controller.target_group:
+        msg = data.get("raw_message", "").strip()
+        if msg == '0s':
+            for p in controller.pigs:
+                p.alive = False
+            controller._schedule_send()
+    if group_id in controller.source_groups:
+        # log("⬅️ 收到群消息: " + data.get("raw_message", "").strip())
+        controller.receiveMsg(data) 
+    return {}
 
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
