@@ -358,7 +358,7 @@ class PigLineController:
 # 🔹 在全局初始化 controller
 controller = PigLineController()
 # 配置 WebSocket 连接地址
-WS_URL = "ws://127.0.0.1:3001"
+WS_URL = "ws://host.docker.internal:3001/"
 
 async def process_message(data):
     """处理从 WebSocket 接收到的消息"""
