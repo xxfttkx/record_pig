@@ -357,9 +357,7 @@ class PigLineController:
 
 # 🔹 在全局初始化 controller
 controller = PigLineController()
-app = FastAPI()
 # 配置 WebSocket 连接地址
-
 WS_URL = "ws://127.0.0.1:3001"
 
 async def process_message(data):
@@ -397,16 +395,6 @@ async def listen(ws_url: str):
             log(f"连接失败或断开: {e}, 10秒后重试...")
             await asyncio.sleep(10)  # 连接失败后等待10秒再重试
 
-@app.on_event("startup")
-async def startup():
-    """FastAPI 启动时启动 WebSocket 监听"""
-    # 启动 WebSocket 监听任务
-    asyncio.create_task(listen(WS_URL))
-
-@app.get("/")
-async def get_status():
-    return {"message": "WebSocket 监听正在运行..."}
-
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding='utf-8')
     # 🔹 参数解析
@@ -428,10 +416,4 @@ if __name__ == "__main__":
         controller.target_group = 691859318
         controller.source_groups = {691859318}
     log(f"pig_wave: {controller.pig_wave}; is_test: {controller.is_test}")
-
-    uvicorn.run(
-        app,
-        host="0.0.0.0",
-        port=8080,
-        access_log=False  # 关闭 uvicorn 的请求日志
-    )
+    asyncio.run(listen(WS_URL))  # 启动 WebSocket 监听
